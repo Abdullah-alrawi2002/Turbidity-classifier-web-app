@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water Turbidity Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0b0f14;
+    --surface: #131920;
+    --surface-raised: #1a2230;
+    --border: #1e2a3a;
+    --border-focus: #2a6496;
+    --text: #c8d6e5;
+    --text-muted: #5a6f85;
+    --text-bright: #e8f0f8;
+    --accent: #3498db;
+    --accent-dim: rgba(52, 152, 219, 0.12);
+    --success: #27ae60;
+    --warn: #f39c12;
+    --danger: #e74c3c;
+    --radius: 8px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  header h1 {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-bright);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  header p {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    position: relative;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: var(--surface);
+  }
+
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .upload-zone input[type="file"] {
+    display: none;
+  }
+
+  .upload-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 14px;
+    opacity: 0.35;
+  }
+
+  .upload-zone p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .upload-zone p strong {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .upload-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 18px;
+  }
+
+  .btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-raised);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--text-bright);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: #2980b9;
+  }
+
+  /* Preview */
+  .preview {
+    display: none;
+    margin-top: 24px;
+  }
+
+  .preview.visible { display: block; }
+
+  .preview-image-wrap {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .preview-image-wrap img {
+    display: block;
+    width: 100%;
+    max-height: 360px;
+    object-fit: contain;
+    background: #000;
+  }
+
+  .clear-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+
+  .clear-btn:hover { background: var(--danger); }
+
+  .analyze-btn {
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px;
+    font-size: 0.9rem;
+  }
+
+  /* Loading */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 32px 0;
+  }
+
+  .loading.visible { display: block; }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading p {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Results */
+  .results {
+    display: none;
+    margin-top: 28px;
+  }
+
+  .results.visible { display: block; }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-class {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-bright);
+  }
+
+  .result-confidence {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.88rem;
+    color: var(--accent);
+  }
+
+  .ntu-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--surface-raised);
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+
+  .prob-list { list-style: none; }
+
+  .prob-item {
+    display: grid;
+    grid-template-columns: 130px 1fr 48px;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+  }
+
+  .prob-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .prob-bar-track {
+    height: 6px;
+    background: var(--surface-raised);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .prob-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+    transition: width 0.5s ease;
+  }
+
+  .prob-bar-fill.top {
+    background: var(--success);
+  }
+
+  .prob-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  /* Error */
+  .error-msg {
+    display: none;
+    margin-top: 20px;
+    padding: 14px 16px;
+    background: rgba(231, 76, 60, 0.08);
+    border: 1px solid rgba(231, 76, 60, 0.25);
+    border-radius: var(--radius);
+    font-size: 0.84rem;
+    color: var(--danger);
+  }
+
+  .error-msg.visible { display: block; }
+
+  /* Color indicators per class */
+  .turbidity-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  .dot-ultra_cloudy  { background: #6c3210; }
+  .dot-very_cloudy   { background: #a0522d; }
+  .dot-cloudy        { background: #cd853f; }
+  .dot-lightly_cloudy { background: #87b1c9; }
+  .dot-lightly_clear { background: #5dade2; }
+  .dot-clear         { background: #2ecc71; }
+
+  @media (max-width: 480px) {
+    .container { padding: 24px 16px 60px; }
+    header h1 { font-size: 0.95rem; }
+    .upload-zone { padding: 36px 16px; }
+    .prob-item { grid-template-columns: 110px 1fr 42px; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Water Turbidity Classifier</h1>
+    <p>Upload or capture a water sample image for NTU analysis</p>
+  </header>
+
+  <div class="upload-zone" id="uploadZone">
+    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+    </svg>
+    <p>Drag and drop an image here or <strong>browse</strong></p>
+    <div class="upload-actions">
+      <button class="btn" id="browseBtn">Choose File</button>
+      <button class="btn" id="cameraBtn">Take Photo</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*">
+    <input type="file" id="cameraInput" accept="image/*" capture="environment">
+  </div>
+
+  <div class="preview" id="preview">
+    <div class="preview-image-wrap">
+      <img id="previewImg" alt="Selected image">
+      <button class="clear-btn" id="clearBtn" title="Remove image">&times;</button>
+    </div>
+    <button class="btn btn-primary analyze-btn" id="analyzeBtn">Analyze Sample</button>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Analyzing turbidity...</p>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="results" id="results">
+    <div class="result-card">
+      <div class="result-header">
+        <span class="result-class" id="resultClass"></span>
+        <span class="result-confidence" id="resultConf"></span>
+      </div>
+      <div class="ntu-range" id="ntuRange"></div>
+      <ul class="prob-list" id="probList"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const API = '/api/predict';
+
+const uploadZone = $('#uploadZone');
+const fileInput = $('#fileInput');
+const cameraInput = $('#cameraInput');
+const preview = $('#preview');
+const previewImg = $('#previewImg');
+const loading = $('#loading');
+const results = $('#results');
+const errorMsg = $('#errorMsg');
+
+let selectedFile = null;
+
+const LABELS = {
+  ultra_cloudy: 'Ultra Cloudy',
+  very_cloudy: 'Very Cloudy',
+  cloudy: 'Cloudy',
+  lightly_cloudy: 'Lightly Cloudy',
+  lightly_clear: 'Lightly Clear',
+  clear: 'Clear',
+};
+
+// File selection
+$('#browseBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  fileInput.click();
+});
+
+$('#cameraBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  cameraInput.click();
+});
+
+uploadZone.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+cameraInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+// Drag and drop
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+  uploadZone.classList.remove('drag-over');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) handleFile(file);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  selectedFile = file;
+  const url = URL.createObjectURL(file);
+  previewImg.src = url;
+  uploadZone.style.display = 'none';
+  preview.classList.add('visible');
+  results.classList.remove('visible');
+  errorMsg.classList.remove('visible');
+}
+
+$('#clearBtn').addEventListener('click', reset);
+
+function reset() {
+  selectedFile = null;
+  previewImg.src = '';
+  fileInput.value = '';
+  cameraInput.value = '';
+  preview.classList.remove('visible');
+  results.classList.remove('visible');
+  errorMsg.classList.remove('visible');
+  loading.classList.remove('visible');
+  uploadZone.style.display = '';
+}
+
+// Analyze
+$('#analyzeBtn').addEventListener('click', analyze);
+
+async function analyze() {
+  if (!selectedFile) return;
+
+  loading.classList.add('visible');
+  results.classList.remove('visible');
+  errorMsg.classList.remove('visible');
+  $('#analyzeBtn').disabled = true;
+
+  try {
+    const form = new FormData();
+    form.append('image', selectedFile);
+
+    const res = await fetch(API, { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || `Server error (${res.status})`);
+    }
+
+    showResults(data);
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.classList.add('visible');
+  } finally {
+    loading.classList.remove('visible');
+    $('#analyzeBtn').disabled = false;
+  }
+}
+
+function showResults(data) {
+  $('#resultClass').innerHTML =
+    `<span class="turbidity-dot dot-${data.predictedClass}"></span>${data.label}`;
+  $('#resultConf').textContent = (data.confidence * 100).toFixed(1) + '%';
+  $('#ntuRange').textContent = `NTU range: ${data.ntuRange.min} - ${data.ntuRange.max}`;
+
+  const list = $('#probList');
+  list.innerHTML = '';
+
+  const maxProb = Math.max(...data.probabilities.map((p) => p.probability));
+
+  data.probabilities.forEach((p) => {
+    const pct = (p.probability * 100).toFixed(1);
+    const isTop = p.probability === maxProb;
+    list.innerHTML += `
+      <li class="prob-item">
+        <span class="prob-label">
+          <span class="turbidity-dot dot-${p.className}"></span>${p.label}
+        </span>
+        <div class="prob-bar-track">
+          <div class="prob-bar-fill${isTop ? ' top' : ''}" style="width:${pct}%"></div>
+        </div>
+        <span class="prob-value">${pct}%</span>
+      </li>`;
+  });
+
+  results.classList.add('visible');
+}
+</script>
+</body>
+</html>
